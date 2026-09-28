@@ -4,17 +4,42 @@ import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from pdfminer.high_level import extract_text
+from docx import Document
 
 def extract_text_from_pdf(uploaded_file):
-    """Extracts text safely from an uploaded file object in-memory."""
+    """Extracts text safely from an uploaded PDF file object in-memory."""
     try:
         if hasattr(uploaded_file, 'getvalue'):
-            # Convert Streamlit UploadedFile bytes stream directly for pdfminer
             pdf_stream = io.BytesIO(uploaded_file.getvalue())
             return extract_text(pdf_stream)
         return extract_text(uploaded_file)
     except Exception as e:
         st.error(f"Error parsing PDF file: {e}")
+        return ""
+
+def extract_text_from_docx(uploaded_file):
+    """Extracts text safely from an uploaded DOCX file object in-memory."""
+    try:
+        if hasattr(uploaded_file, 'getvalue'):
+            docx_stream = io.BytesIO(uploaded_file.getvalue())
+            doc = Document(docx_stream)
+        else:
+            doc = Document(uploaded_file)
+            
+        full_text = []
+        # Extract structural text from standard paragraphs
+        for paragraph in doc.paragraphs:
+            full_text.append(paragraph.text)
+            
+        # Extract text out of tables (vital for resumes styled inside table matrices)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    full_text.append(cell.text)
+                    
+        return "\n".join(full_text)
+    except Exception as e:
+        st.error(f"Error parsing DOCX file: {e}")
         return ""
 
 def clean_text(text):
@@ -31,13 +56,11 @@ def calculate_similarity(resume_text, jd_text):
     if not resume_text or not jd_text:
         return 0.0
     try:
-        # Use  stop words to filter out common structural terms
         vectorizer = TfidfVectorizer(stop_words='english')
         vectors = vectorizer.fit_transform([resume_text, jd_text])
         score = cosine_similarity(vectors[0:1], vectors[1:2])
-        return round(float(score[0][0]) * 100, 2)
+        return round(float(score) * 100, 2)
     except ValueError:
-        # Failsafe if text contains only stop words or is completely empty
         return 0.0
 
 def find_missing_keywords(resume_clean, jd_clean):
