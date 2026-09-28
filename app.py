@@ -4,7 +4,7 @@ import utils
 st.set_page_config(page_title="AI Resume Screener", page_icon="🎯", layout="wide")
 
 st.title("🎯 AI Resume Screener")
-st.markdown("Compare multiple resumes against a job description instantly using TF-IDF text similarity.")
+st.markdown("Compare multiple resumes (PDF and DOCX) against a job description instantly using TF-IDF text similarity.")
 
 # Job Description Input Section
 st.subheader("📝 Job Description")
@@ -13,7 +13,7 @@ jd_clean = utils.clean_text(jd_input)
 
 # Resume Upload Section
 st.subheader("📤 Upload Resumes")
-uploaded_files = st.file_uploader("Upload multiple resumes (PDF format)", type=["pdf"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload multiple resumes (PDF or DOCX format)", type=["pdf", "docx"], accept_multiple_files=True)
 
 if uploaded_files:
     if not jd_clean:
@@ -24,11 +24,18 @@ if uploaded_files:
 
         # Process uploaded files
         for uploaded_file in uploaded_files:
-            resume_text = utils.extract_text_from_pdf(uploaded_file)
+            # Route logic based on file extension
+            if uploaded_file.name.lower().endswith('.pdf'):
+                resume_text = utils.extract_text_from_pdf(uploaded_file)
+            elif uploaded_file.name.lower().endswith('.docx'):
+                resume_text = utils.extract_text_from_docx(uploaded_file)
+            else:
+                resume_text = ""
+                
             resume_clean = utils.clean_text(resume_text)
             
             if not resume_clean.strip():
-                st.warning(f"Could not extract meaningful text from **{uploaded_file.name}**. It might be scanned or empty.")
+                st.warning(f"Could not extract meaningful text from **{uploaded_file.name}**. It might be scanned, empty, or corrupted.")
                 continue
                 
             match_score = utils.calculate_similarity(resume_clean, jd_clean)
@@ -44,7 +51,7 @@ if uploaded_files:
         # Display Results in UI
         if results:
             for res in results:
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns()
                 with col1:
                     st.write(f"📁 **{res['Resume']}**")
                     st.progress(int(res['Score']))
