@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import utils
 
 st.set_page_config(page_title="AI Resume Screener", page_icon="🎯", layout="wide")
@@ -39,28 +40,47 @@ if uploaded_files:
                 continue
                 
             match_score = utils.calculate_similarity(resume_clean, jd_clean)
-            keyword_hint = utils.find_missing_keywords(resume_clean, jd_clean) if match_score < 70 else ""
+            keyword_hint = utils.find_missing_keywords(resume_clean, jd_clean) if match_score < 70 else "N/A"
 
             results.append({
-                "Resume": uploaded_file.name,
-                "Score": match_score,
-                "Recommendation": "✅ Strong Match" if match_score >= 70 else "⚠️ Needs Improvement",
-                "Hint": keyword_hint
+                "Resume Name": uploaded_file.name,
+                "Match Score (%)": match_score,
+                "Status": "✅ Strong Match" if match_score >= 70 else "⚠️ Needs Improvement",
+                "Missing Keywords Hint": keyword_hint
             })
 
-        # Display Results in UI
+        # Display Summary Matrix and Export Options
         if results:
+            df = pd.DataFrame(results)
+            
+            # Interactive Data Matrix Table View
+            st.dataframe(df, use_container_width=True)
+            
+            # Conversion pipeline to CSV stream
+            csv_data = df.to_csv(index=False).encode('utf-8')
+            
+            # Dynamic Export Button Layout
+            st.download_button(
+                label="📥 Export Report as CSV",
+                data=csv_data,
+                file_name="resume_screening_report.csv",
+                mime="text/csv",
+                key="download-csv"
+            )
+            
+            st.markdown("### 🔍 Individual Structural Breakdown")
+            # Display detailed progress views underneath matrix
             for res in results:
                 col1, col2 = st.columns()
                 with col1:
-                    st.write(f"📁 **{res['Resume']}**")
-                    st.progress(int(res['Score']))
+                    st.write(f"📁 **{res['Resume Name']}**")
+                    st.progress(int(res['Match Score (%)']))
                 with col2:
-                    st.write(f"Match Score: **{res['Score']}%**")
-                    st.caption(res['Recommendation'])
+                    st.write(f"Match Score: **{res['Match Score (%)']}%**")
+                    st.caption(res['Status'])
                     
-                if res['Hint']:
-                    st.markdown(f"🔍 *Might be missing important terms:* `{res['Hint']}`")
+                if res['Missing Keywords Hint'] != "N/A":
+                    st.markdown(f"🔍 *Might be missing important terms:* `{res['Missing Keywords Hint']}`")
                 st.markdown("---")
 else:
     st.info("Please upload at least one resume to begin screening.")
